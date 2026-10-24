@@ -1,0 +1,67 @@
+config:
+  defaults:
+    headers:
+      Authorization: "Bearer {{ $processEnvironment.JWT_TOKEN }}"
+  target: "http://localhost:3000"
+  plugins:
+    ensure: {}
+    expect:
+      reportFailuresAsErrors: true
+      outputFormat: prettyError
+    metrics-by-endpoint: {}
+  phases:
+    - duration: 20
+      arrivalRate: 5
+      name: "1. Fase de calentamiento (trafico base)"
+    - duration: 30
+      arrivalRate: 15
+      rampTo: 50
+      name: "2. Fase de saturacion maxima (pico de carga)"
+  # Sintaxis de compatibilidad para el porcentaje de usuarios fallidos.
+  ensure:
+    thresholds:
+      - "http.response_time.p99": 200
+    maxErrorRate: 1
+  environments:
+    smoke:
+      phases:
+        - duration: 1
+          arrivalRate: 1
+          arrivalCount: 1
+          name: "Verificacion funcional con un usuario"
+        - duration: 1
+          pause: 1
+          arrivalRate: 0
+          rampTo: 0
+          name: "Sin fase de saturacion en smoke"
+
+scenarios:
+  - name: "Inundacion transaccional perimetral (payloads mixtos Zod)"
+    flow:
+      # Flujo A: datos validos; recorre controlador, repositorio y base de datos.
+      - post:
+          url: "/api/empleados"
+          name: "crear_valido"
+          json:
+            nombre: "Andrés Mendoza"
+            cargo: "Software Architect"
+            departamento: "I+D"
+            sueldo: 4200
+          capture:
+            - json: "$.data._id"
+              as: "employeeId"
+          expect:
+            - statusCode: 201
+            - hasProperty: "data._id"
+      - think: 1
+      # Flujo B: Zod debe rechazarlo antes de llamar al repositorio.
+      - post:
+          url: "/api/empleados"
+          name: "rechazo_dto"
+          json:
+            nombre: "Al"
+            cargo: "Dev"
+            departamento: "TI"
+            sueldo: -500
+          expect:
+            - statusCode: 400

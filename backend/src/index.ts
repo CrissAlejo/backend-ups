@@ -1,18 +1,11 @@
-import express from 'express';
-import cors from 'cors';
-import morgan from 'morgan';
-import { connectDatabase } from './config/database';
+import 'dotenv/config';
+import { getJwtSecret } from './config/auth.js';
+import { createApp } from './app.js';
+import { connectDatabase } from './config/database.js';
+import { MongooseEmployeeRepository } from './repositories/mongoose-employee.repository.js';
 
-
- 
-const app=express(); 
-const port = 3000 
-connectDatabase(); // Conexión a la base de datos
-app.use(morgan('dev'));
- 
-app.use(express.json());
-app.use(cors()); 
-
-app.listen(port, ()=>{ 
-    console.log('Servidor escuchando en el puerto ' + port); 
-})
+getJwtSecret();
+await connectDatabase();
+const port = Number(process.env['PORT'] ?? 3000);
+const app = createApp(new MongooseEmployeeRepository());
+app.listen(port, () => console.log(`Servidor escuchando en el puerto ${port}`));
